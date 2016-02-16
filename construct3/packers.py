@@ -14,22 +14,31 @@ from six.moves import xrange
 
 class PackerError(Exception):
     pass
+
+
 class RawError(PackerError):
     pass
+
+
 class RangeError(PackerError):
     pass
+
+
 class SwitchError(PackerError):
     pass
 
 
 class Packer(object):
     __slots__ = ()
+
     def pack(self, obj):
         stream = BytesIO()
         self._pack(obj, stream, {}, Config())
         return stream.getvalue()
+
     def pack_to_stream(self, obj, stream):
         self._pack(obj, stream, {}, Config())
+
     def _pack(self, obj, stream, ctx, cfg):
         raise NotImplementedError()
 
@@ -37,11 +46,13 @@ class Packer(object):
         if not hasattr(buf_or_stream, "read"):
             buf_or_stream = BytesIO(buf_or_stream)
         return self._unpack(buf_or_stream, {}, Config())
+
     def _unpack(self, stream, ctx, cfg):
         raise NotImplementedError()
 
     def sizeof(self, ctx = None, cfg = None):
         return self._sizeof(ctx or {}, cfg or Config())
+
     def _sizeof(self, ctx, cfg):
         raise NotImplementedError()
     
@@ -53,14 +64,24 @@ class Packer(object):
             if count.step:
                 raise ValueError("Slice must not contain as step: %r" % (count,))
             return Range(count.start, count.stop, self)
+
         elif isinstance(count, six.integer_types) or hasattr(count, "__call__"):
             return Range(count, count, self)
+
         else:
             raise TypeError("Expected a number, a contextual expression or a slice thereof, got %r" % (count,))
+
     def __rtruediv__(self, name):
         if name is not None and not isinstance(name, str):
             raise TypeError("`name` must be a string or None, got %r" % (name,))
         return (name, self)
+
+    def __rshift__(self, other):
+        if not isinstance(other, Packer):
+            raise TypeError("Other arg must be Packer instance")
+
+        return Sequence(self, other)
+
     __rdiv__ = __rtruediv__
 
 
@@ -76,6 +97,7 @@ class noop(Packer):
     def _sizeof(self, ctx, cfg):
         return 0
 
+
 class CtxConst(object):
     __slots__ = ["value"]
     def __init__(self, value):
@@ -85,21 +107,23 @@ class CtxConst(object):
     def __call__(self, ctx):
         return self.value
 
+
 def _contextify(value):
     if hasattr(value, "__call__"):
         return value
     else:
         return CtxConst(value)
 
+
 class Adapter(Packer):
     #__slots__ = ["underlying", "_decode", "_encode"]
     def __init__(self, underlying, decode = None, encode = None):
         self.underlying = underlying
 
-        if not hasattr(self, '_decode') and decode is None:
+        if not hasattr(self, '_decode'):
             self._decode = decode
 
-        if not hasattr(self, '_encode') and encode is None:
+        if not hasattr(self, '_encode'):
             self._encode = encode
 
     def __repr__(self):
@@ -108,22 +132,28 @@ class Adapter(Packer):
     def _pack(self, obj, stream, ctx, cfg):
         obj2 = self.encode(obj, ctx)
         self.underlying._pack(obj2, stream, ctx, cfg)
+
     def _unpack(self, stream, ctx, cfg):
         obj = self.underlying._unpack(stream, ctx, cfg)
         return self.decode(obj, ctx)
+
     def _sizeof(self, ctx, cfg):
         return self.underlying._sizeof(ctx, cfg)
     
     def encode(self, obj, ctx):
         if self._encode:
             return self._encode(obj, ctx)
+
         else:
             return obj
+
     def decode(self, obj, ctx):
         if self._decode:
             return self._decode(obj, ctx)
+
         else:
             return obj
+
 
 class Raw(Packer):
     __slots__ = ["length"]
@@ -145,6 +175,7 @@ class Raw(Packer):
     def _sizeof(self, ctx, cfg):
         return self.length(ctx)
 
+
 def Named(*args, **kwargs):
     if (args and kwargs) or (not args and not kwargs):
         raise TypeError("This function takes either two positional arguments or a single keyword attribute", 
@@ -165,6 +196,7 @@ def Named(*args, **kwargs):
     if isinstance(args[1], UnnamedPackerMixin):
         raise TypeError("%s cannot take a name" % (args[1].__class__.__name__,))
     return tuple(args)
+
 
 class UnnamedPackerMixin(object):
     # make us look like a tuple
@@ -194,6 +226,7 @@ class Embedded(UnnamedPackerMixin, Packer):
     def _sizeof(self, ctx, cfg):
         with cfg.set(embedded = True):
             return self.underlying._sizeof(ctx, cfg)
+
 
 class Struct(Packer):
     __slots__ = ["members", "container_factory"]
@@ -264,8 +297,10 @@ class Sequence(Packer):
     def __init__(self, *members, **kwargs):
         self.members = members
         self.container_factory = kwargs.pop("container_factory", list)
+
         if kwargs:
             raise TypeError("Invalid keyword argument(s): %s" % (", ".join(kwargs.keys()),))
+
         for mem in members:
             if not isinstance(mem, Packer):
                 raise TypeError("Sequence members must be Packers: %r" % (mem,))
@@ -281,19 +316,23 @@ class Sequence(Packer):
             i = cfg.name + 1
             del cfg.embedded
             embedded = True
+
         else:
             ctx2 = {"_" : ctx}
             obj = factory()
             i = 0
             embedded = False
+
         with cfg.set(container = obj, ctx = ctx, container_factory = factory):
             for pkr in self.members:
                 cfg.name = i
                 obj2 = pkr._unpack(stream, ctx2, cfg)
+
                 if obj2 is not None:
                     obj.append(obj2)
                     ctx2[i] = obj2
                     i += 1
+
         return None if embedded else obj
     
     def _pack(self, obj, stream, ctx, cfg):
@@ -302,19 +341,33 @@ class Sequence(Packer):
         i = 0
         for pkr in self.members:
             if isinstance(pkr, Padding):
-                pkr._pack(None, stream, ctx2)
+                pkr._pack(None, stream, ctx2, cfg)
             else:
                 obj2 = ctx2[i] = obj[i]
-                pkr._pack(obj2, stream, ctx2)
+                pkr._pack(obj2, stream, ctx2, cfg)
                 i += 1
     
     def _sizeof(self, ctx, cfg):
         if cfg.embedded:
             ctx2 = ctx
             del cfg.embedded
+
         else:
             ctx2 = {"_" : ctx}
+
         return sum(pkr._sizeof(ctx2) for pkr in self.members)
+
+    def __rshift__(self, other):
+        if isinstance(other, Sequence):
+            new_members = self.members + other.members
+
+        else:
+            if not isinstance(other, Packer):
+                raise TypeError("Other arg must be Packer instance")
+
+            new_members = self.members + (other,)
+
+        return Sequence(*new_members)
 
 
 class Range(Packer):
@@ -331,9 +384,11 @@ class Range(Packer):
         mincount = self.mincount(ctx)
         if mincount is None:
             mincount = 0
+
         maxcount = self.maxcount(ctx)
         if maxcount is None:
             maxcount = sys.maxsize
+
         assert maxcount >= mincount
         if len(obj) < mincount or len(obj) > maxcount:
             raise RangeError("Expected %s items, found %s" % (
@@ -451,6 +506,7 @@ class Bitwise(Packer):
     def _sizeof(self, ctx, cfg):
         return self.underlying._sizeof(ctx, cfg) // 8
 
+
 @singleton
 class anchor(Packer):
     __slots__ = ()
@@ -462,6 +518,7 @@ class anchor(Packer):
         ctx[cfg.name] = stream.tell()
     def _sizeof(self, ctx, cfg):
         return 0
+
 
 class Pointer(Packer):
     __slots__ = ["underlying", "offset"]
