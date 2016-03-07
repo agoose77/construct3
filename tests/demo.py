@@ -32,20 +32,19 @@ class VariableArrayPacker(Adapter):
 _packers = {}
 
 
-def register_message(opcode, packer):
+def registered_packer(opcode, *args):
+    packer = Struct(*args)
     _packers[opcode] = packer
+    return packer
 
 
-some_packer = Struct("name" / PascalString(uint8), "day_no" / uint8)
-register_message(1, some_packer)
+some_packer = registered_packer(1, "name" / PascalString(uint8), "day_no" / uint8)
 
 from construct3.macros import Switch
 
 ex = dict(op_id=1, body=dict(name="james", day_no=1))
 
 message_packer = Struct("op_id" / uint8, "body" / Switch(this.op_id, _packers))
-
-array_packer = Struct("length" / uint8, "body")
 
 p = message_packer.pack(ex)
 print(message_packer.unpack(p).body.name)
