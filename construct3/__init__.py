@@ -7,7 +7,7 @@ from construct3.numbers import (uint8, sint8, uint16b, sint16b, uint16l, sint16l
     word32, int32, word64, int64, float32, float64, Bits, bit, nibble, octet, uint24l, sint24l, uint24b, sint24b, 
     TwosComplement, MaskedInteger)
 from construct3.macros import If, PascalString, Array, Bijection, Enum, flag, BitStruct
-from construct3.adapters import Computed, OneOf, NoneOf, StringAdapter, LengthValue, Padding
+from construct3.adapters import Computed, OneOf, NoneOf, StringAdapter, LengthPrefixed, Padding
 
 __author__ = "Tomer Filiba <tomerfiliba@gmail.com>"
 

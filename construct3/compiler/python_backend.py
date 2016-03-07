@@ -184,7 +184,7 @@ def generate(pkr, name):
 if __name__ == "__main__":
     from construct3.lib import this
     from construct3.numbers import byte
-    from construct3.adapters import LengthValue
+    from construct3.adapters import LengthPrefixed
     #testpkr = Sequence(byte, byte, Sequence(byte, byte, Raw(this[0] + this[1] + this._[0] + this._[1])))
     testpkr = Struct("len" / byte, "gth" / byte, "data" / Raw(this.len + this.gth))
     mod = generate(testpkr, "test")

@@ -84,22 +84,31 @@ class Mapping(Adapter):
 #    def encode(self, obj, ctx):
 #        return self.value
 
-class LengthValue(Adapter):
+
+class LengthPrefixed(Adapter):
     __slots__ = ()
+
     def __init__(self, lengthpkr):
-        Adapter.__init__(self, Sequence(lengthpkr, Raw(this[0])))
+        underlying = Sequence(lengthpkr, Raw(this[0]))
+        Adapter.__init__(self, underlying)
+
     def decode(self, obj, ctx):
         return obj[1]
+
     def encode(self, obj, ctx):
         return [len(obj), obj]
 
+
 class StringAdapter(Adapter):
     __slots__ = ["encoding"]
+
     def __init__(self, underlying, encoding):
         Adapter.__init__(self, underlying)
         self.encoding = encoding
+
     def decode(self, obj, ctx):
         return obj.decode(self.encoding)
+
     def encode(self, obj, ctx):
         return obj.encode(self.encoding)
 

@@ -1,13 +1,56 @@
-from construct3 import uint8, this, Adapter, Raw, int16, Struct, Enum, Sequence
+from construct3 import *#uint8, this, Adapter, Raw, int16, Struct, Enum, Sequence
 byte = uint8
 
-ipaddr = Sequence(byte, byte, byte, byte)
-print(ipaddr.unpack("ABCD".encode()))               # [65, 66, 67, 68]
-print(ipaddr.pack([65, 66, 67, 68]))       # ABCD
+# b = BitStruct('a' / uint8, 'b'/uint8,'c'/uint8,'d'/uint8,'e'/uint8,'f'/uint8,'g'/uint8,'h'/uint8)
+# print(b)
+# r = b.pack(dict(a=True,b=True,c=False,d=True,e=False,f=False,g=True,h=True))
+# print(b.unpack(r))
 
-ipaddr = byte >> byte >> byte >> byte
-print(ipaddr.unpack(b"ABCD"))               # [65, 66, 67, 68]
-print(ipaddr)
+
+class VariableArrayPacker(Adapter):
+    __slots__ = ()
+
+    def __init__(self, lengthpkr, itempkr):
+        underlying = Sequence(lengthpkr, Array(this[0], itempkr))
+        Adapter.__init__(self, underlying)
+
+    def decode(self, obj, ctx):
+        return obj[1]
+
+    def encode(self, obj, ctx):
+        return [len(obj), obj]
+#
+# int_list_packer = VariableArrayPacker(uint8,uint8)
+# x = int_list_packer.pack([1,2,3,4])
+# print(x)
+# print(int_list_packer.unpack(x))
+#
+#
+# print(LengthPrefixed(uint8).pack(b'hello'))
+
+
+_packers = {}
+
+
+def register_message(opcode, packer):
+    _packers[opcode] = packer
+
+
+some_packer = Struct("name" / PascalString(uint8), "day_no" / uint8)
+register_message(1, some_packer)
+
+from construct3.macros import Switch
+
+ex = dict(op_id=1, body=dict(name="james", day_no=1))
+
+message_packer = Struct("op_id" / uint8, "body" / Switch(this.op_id, _packers))
+
+array_packer = Struct("length" / uint8, "body")
+
+p = message_packer.pack(ex)
+print(message_packer.unpack(p).body.name)
+
+
 #
 # ipaddr = byte[4]
 # print(ipaddr.unpack("ABCD".encode()))               # [65, 66, 67, 68]

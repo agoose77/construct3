@@ -1,5 +1,4 @@
 import struct as _struct
-import struct as _struct
 
 def test_unpack(stream):
     var0 = {}

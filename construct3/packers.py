@@ -157,21 +157,26 @@ class Adapter(Packer):
 
 class Raw(Packer):
     __slots__ = ["length"]
+
     def __init__(self, length):
         self.length = _contextify(length)
+
     def __repr__(self):
         return "Raw(%r)" % (self.length,)
+
     def _pack(self, obj, stream, ctx, cfg):
         length = self.length(ctx)
         if len(obj) != length:
             raise RawError("Expected buffer of length %d, got %d" % (length, len(obj)))
         stream.write(obj)
+
     def _unpack(self, stream, ctx, cfg):
         length = self.length(ctx)
         data = stream.read(length)
         if len(data) != length:
             raise RawError("Expected buffer of length %d, got %d" % (length, len(data)))
         return data
+
     def _sizeof(self, ctx, cfg):
         return self.length(ctx)
 
@@ -236,15 +241,20 @@ class Struct(Packer):
         self.container_factory = kwargs.pop("container_factory", None)
         if kwargs:
             raise TypeError("invalid keyword argument(s): %s" % (", ".join(kwargs.keys()),))
+
         names = set()
-        for mem in members:
-            if (not hasattr(mem, "__len__") or len(mem) != 2 or
-                    not isinstance(mem[0], (type(None), str)) or not isinstance(mem[1], Packer)):
-                raise TypeError("Struct members must be 2-tuples of (name, Packer): %r" % (mem,))
-            if mem[0] in names:
-                raise TypeError("Member %r already exists in this struct" % (mem[0],))
-            if mem[0]:
-                names.add(mem[0])
+        for member in members:
+            if (not hasattr(member, "__len__") or len(member) != 2
+                    or not isinstance(member[0], (type(None), str))
+                    or not isinstance(member[1], Packer)):
+                raise TypeError("Struct members must be 2-tuples of (name, Packer): %r" % (member,))
+
+            name, packer = member
+            if name in names:
+                raise TypeError("Member %r already exists in this struct" % (name,))
+
+            if name:
+                names.add(name)
 
     def __repr__(self):
         return "Struct(%s)" % (", ".join(repr(m) for m in self.members),)
@@ -428,6 +438,7 @@ class Range(Packer):
 
 class While(Packer):
     __slots__ = ["cond", "itempkr"]
+
     def __init__(self, cond, itempkr):
         self.cond = cond
         self.itempkr = itempkr
@@ -461,6 +472,7 @@ class While(Packer):
 
 class Switch(Packer):
     __slots__ = ["expr", "cases", "default"]
+
     def __init__(self, expr, cases, default = NotImplemented):
         self.expr = expr
         self.cases = cases

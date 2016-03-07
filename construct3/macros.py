@@ -1,6 +1,6 @@
 from six import b
 from construct3.packers import Switch, _contextify, Range, Raw, Struct, Bitwise
-from construct3.adapters import LengthValue, StringAdapter, Mapping, Padding
+from construct3.adapters import LengthPrefixed, StringAdapter, Mapping, Padding
 
 
 def If(cond, thenpkr, elsepkr):
@@ -8,7 +8,7 @@ def If(cond, thenpkr, elsepkr):
         {True : thenpkr, False : elsepkr})
 
 def PascalString(lengthpkr, encoding = "utf8"):
-    return StringAdapter(LengthValue(lengthpkr), encoding)
+    return StringAdapter(LengthPrefixed(lengthpkr), encoding)
 
 def Array(count, itempkr):
     return Range(count, count, itempkr)
